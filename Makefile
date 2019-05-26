@@ -65,15 +65,15 @@ vpath %.c $(SRCDIRS)
 TARGET           = $(MAKEROOT)executible
 MAKEFILE         = $(MAKEROOT)Makefile
 
-COMMON_CFLAGS    = -g -O2 -march=$(ARCHITECTURE_TARGET)
+COMMON_CFLAGS    = -O2 -march=$(ARCHITECTURE_TARGET)
 
 INCLUDE          += $(foreach DIR, $(INCDIRS), -I$(DIR)) $(foreach DIR, $(SYSINCDIRS), -isystem $(DIR))
-CUINCLUDE        = -lcudart -lcublas -lcublasLt -lcurand -lcufft_static -lculibos -lnvToolsExt
+CUINCLUDE        = -lcudart -lcublas -lcublasLt -lcurand -lcufft
 
 
 DEBUG            +=
 DEFINES          +=
-LFLAGS           += -std=c++14 -g -O2 -pthread
+LFLAGS           += -std=c++14 -O2 -pthread
 LADD             += -L$(CUDA_BUILD_DIR)lib -L$(OBJ) -L$(GPUOBJ) $(CUINCLUDE) -lrt -lm
 CFLAGS           += $(COMMON_CFLAGS)
 CCPPFLAGS        += -std=c++14 $(COMMON_CFLAGS)
@@ -84,7 +84,7 @@ CPPDEPFLAGS      += -std=c++14 -march=$(ARCHITECTURE_TARGET)
 NVCCDEPFLAGS     += -std=c++14 -march=$(ARCHITECTURE_TARGET)
 
 all: $(TARGET)
-	chmod a+x $(TARGET)
+> chmod a+x $(TARGET)
 
 #**********************************************************************
 #
@@ -314,6 +314,7 @@ GENCODE_FLAGS += -gencode arch=compute_$(HIGHEST_SM),code=compute_$(HIGHEST_SM)
 endif
 endif
 
+NVCCFLAGS+=$(GENCODE_FLAGS)
 #**********************************************************************
 # Setup Portable Directory Locations
 #**********************************************************************
@@ -466,7 +467,7 @@ $(GPUOBJ)%.o: %.cu $(MAKEFILE)
 > $(ECHO) -n $(GPUOBJ) > $(TMP)$(notdir $<).d
 > $(MKDEP) -x c++ $(NVCCDEPFLAGS) $< >> $(TMP)$(notdir $<).d
 > $(ECHO) [$@] from [$<]
-> $(NVCC) $(NVCCFLAGS) -c -o $@ $<
+> $(NVCC) $(NVCCFLAGS) -dc -o $@ $<
 #**********************************************************************
 # Makefile file generation
 #**********************************************************************
@@ -486,20 +487,26 @@ $(GPUOBJ)gpuobjdir.txt:
 > $(MKDIR) $(dir $(GPUOBJ))
 > $(ECHO) "# This is the GPUOBJ File Directory." > $@
 
+$(GPUOBJ_RL)gpurelobjdir.txt:
+> $(ECHO) [$@]
+> $(MKDIR) $(dir $(GPUOBJ_RL))
+> $(ECHO) "# This is the GPUOBJ_RL File Directory." > $@
+
 #**********************************************************************
 # Object Linking and Target Output
 #**********************************************************************
 
 $(TARGET): $(OBJECTS) $(GPUOBJECTS)
 > $(ECHO) [$@]
-> $(NVCC) $(NVCCFLAGS) -dlink $(GPUOBJRELOC) -o $(GPUOBJ_RL)reloc_gpu_objects.o $(CUINCLUDE)
-> $(LD) $(LFLAGS) -o $@  $(GPUOBJ_RL)reloc_gpu_objects.o $(GPUOBJECTS) $(GPUOBJRELOC)  $(OBJECTS)  $(LADD)
+> $(NVCC) $(NVCCFLAGS) -dlink $(CUINCLUDE) $(GPUOBJECTS) -o $(GPUOBJ_RL)reloc_gpu_objects.o
+> $(LD) $(LFLAGS) $(GPUOBJ_RL)reloc_gpu_objects.o $(GPUOBJECTS)  $(OBJECTS)  $(LADD) -o $@
 
 # MAKECMDGOALS is a make variable so you don't touch it, it is the target
 ifeq (, $(filter $(MAKECMDGOALS), clean))
-> # Things to execute if we aren't cleaning
-> include $(TMP)tmpdir.txt
-> include $(OBJ)objdir.txt
-> include $(GPUOBJ)gpuobjdir.txt
-> -include $(DEPENDS)
+	# Things to execute if we aren't cleaning
+	include $(TMP)tmpdir.txt
+	include $(OBJ)objdir.txt
+	include $(GPUOBJ)gpuobjdir.txt
+	include $(GPUOBJ_RL)gpurelobjdir.txt
+	-include $(DEPENDS)
 endif
