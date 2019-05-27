@@ -49,20 +49,15 @@ extern uint64_t NCO_Step_Size;
 
 extern uint64_t iteration;
 
-// Saying that the ground system is this much ppm slower than the sat
-// i.e. if i get 199,999 samples when I should have gotten 200,000 i am -x
-// ppm slower than the sat
-// Updated upon each processing step as well
 extern int64_t PPM_Offset;
 
 // Load in coefficients
-__constant__ float d_coeffs[K_MAC][POLYNOMIAL_ORDER_MAC + 1] = {
-#include "resample_porder5_m31.txt"
-};
+extern __constant__ float d_coeffs[K_MAC * (POLYNOMIAL_ORDER_MAC + 1)];
 
 // TODO, just to verify proper read in
-const float coeffs[K_MAC][POLYNOMIAL_ORDER_MAC + 1] = {
-#include "resample_porder5_m31.txt"
+const float coeffs[K_MAC * (POLYNOMIAL_ORDER_MAC + 1)] =
+{
+   #include "resample_porder5_m31.txt"
 };
 
 __host__ cudaError_t initialize_frf_coefficients_in_constant_memory(float*);

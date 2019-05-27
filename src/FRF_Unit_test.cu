@@ -33,20 +33,29 @@ int64_t PPM_Offset = 0LL;
 
 int main(void)
 {
-   float local_coeffs[K_MAC][POLYNOMIAL_ORDER_MAC + 1] = {0.0f};
+   float local_coeffs[K_MAC * (POLYNOMIAL_ORDER_MAC + 1)] = {0.0f};
 
-   checkCuda( cudaMemcpyFromSymbol(&d_coeffs,
-               &local_coeffs,
+   float pretest = 10.0f;
+   float *d_test;
+   float posttest = 0.0f;
+
+   checkCuda( cudaMalloc((void **)&d_test,
+                        sizeof(float) * 1));
+
+      checkCuda( cudaMemcpy(d_complex_reverse_state, reverse_state,
+   (sizeof(complex64)) * (static_cast<unsigned long int>(K) - 1UL),
+   cudaMemcpyHostToDevice));
+
+   checkCuda( cudaMemcpyFromSymbol(d_coeffs,
+               local_coeffs,
                (K_MAC * (POLYNOMIAL_ORDER_MAC + 1)) * sizeof(float),
                0,
                cudaMemcpyDeviceToHost));
 
-   for(uint16_t k = 0; k < K_MAC; ++k)
+   for(uint16_t index = 0; index < (K_MAC * (POLYNOMIAL_ORDER_MAC + 1)); ++index)
    {
-      for(uint16_t p = 0; p < (POLYNOMIAL_ORDER_MAC + 1); ++p)
-      {
-         std::cout << "local_coeffs["k"]["p"] = "local_coeffs[k][p] << std::endl;
-         std::cout << "local_coeffs["k"]["p"] = "local_coeffs[k][p] << std::endl;
-      }
+      std::cout << "local_coeffs[" << index << "] = " << local_coeffs[index] << std::endl;
+      std::cout << "coeffs[" << index << "] = " << coeffs[index] << std::endl;
    }
+
 }
