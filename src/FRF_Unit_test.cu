@@ -42,9 +42,15 @@ int main(void)
    checkCuda( cudaMalloc((void **)&d_test,
                         sizeof(float) * 1));
 
-      checkCuda( cudaMemcpy(d_complex_reverse_state, reverse_state,
-   (sizeof(complex64)) * (static_cast<unsigned long int>(K) - 1UL),
+      checkCuda( cudaMemcpy((void *)d_test, (void *)&pretest,
+   (sizeof(float)) * 1,
    cudaMemcpyHostToDevice));
+
+         checkCuda( cudaMemcpy(&posttest, d_test,
+   (sizeof(float)) * 1,
+   cudaMemcpyDeviceToHost));
+
+   std::cout << "posttest = " << posttest << std::endl;
 
    checkCuda( cudaMemcpyFromSymbol(d_coeffs,
                local_coeffs,

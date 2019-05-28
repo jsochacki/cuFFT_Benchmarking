@@ -20,6 +20,12 @@ __constant__ float d_coeffs[K_MAC * (POLYNOMIAL_ORDER_MAC + 1)] =
    #include "resample_porder5_m31.txt"
 };
 
+// TODO, just to verify proper read in
+const float coeffs[K_MAC * (POLYNOMIAL_ORDER_MAC + 1)] =
+{
+   #include "resample_porder5_m31.txt"
+};
+
 __host__ cudaError_t initialize_frf_coefficients_in_constant_memory(float *coefficients_vector)
 {
    return cudaMemcpyToSymbol(d_rev_coeffs,
