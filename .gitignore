@@ -15,3 +15,7 @@
 obj/
 tmp/
 executible
+
+# VSCODE Generated
+*.bin
+*.ipch
