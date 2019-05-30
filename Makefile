@@ -41,30 +41,6 @@ INCDIRS    =  ./inc/ $(SRCDIRS) $(CUDA_DIR)/samples/common/inc
 SYSINCDIRS =  $(CUDA_BUILD_DIR)include/
 
 #**********************************************************************
-# Setup Portable Directory Locations
-#**********************************************************************
-
-ifeq ($(TARGET_OS),cygwin)
-   GNU             = /bin/
-   CCBIN           = /usr/bin/
-   BIN             = /usr/bin/
-endif
-
-ifeq ($(TARGET_OS),linux)
-   GNU             = /bin/
-   CCBIN           = /usr/bin/
-   BIN             = /usr/bin/
-   NVCCBIN         = $(CUDA_DIR)/bin/
-endif
-
-ifeq ($(TARGET_OS),osx)
-   GNU             = /bin/
-   CCBIN           = /usr/bin/
-   BIN             = /usr/bin/
-   NVCCBIN         = $(CUDA_DIR)/bin/
-endif
-
-#**********************************************************************
 # Object file creation and per-file dependency generation
 #**********************************************************************
 # vpath can't find auto-generated files, so we need to explicitly have a rule for them
@@ -152,6 +128,32 @@ endif
 endif
 
 NVCCFLAGS+=$(GENCODE_FLAGS)
+
+
+#**********************************************************************
+# Setup Portable Directory Locations
+#**********************************************************************
+
+ifeq ($(TARGET_OS),cygwin)
+   GNU             = /bin/
+   CCBIN           = /usr/bin/
+   BIN             = /usr/bin/
+endif
+
+ifeq ($(TARGET_OS),linux)
+   GNU             = /bin/
+   CCBIN           = /usr/bin/
+   BIN             = /usr/bin/
+   NVCCBIN         = $(CUDA_DIR)/bin/
+endif
+
+ifeq ($(TARGET_OS),osx)
+   GNU             = /bin/
+   CCBIN           = /usr/bin/
+   BIN             = /usr/bin/
+   NVCCBIN         = $(CUDA_DIR)/bin/
+endif
+
 
 #**********************************************************************
 # Setup Compiler and Binutils
@@ -276,6 +278,10 @@ debug: $(MAKEFILE)
 	$(ECHO) $(GPUOBJECTS)
 	$(ECHO) $(NVCC)
 	$(ECHO) $(CCPP)
+	$(ECHO) $(CUDA_DIR)
+	$(ECHO) $(NVCCBIN)
+	$(ECHO) $(HOST_COMPILER)
+	$(ECHO) $(TARGET_OS)
 
 
 # Cleans up all temporary files, including object files.
