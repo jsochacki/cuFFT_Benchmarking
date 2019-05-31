@@ -26,7 +26,7 @@ TMP             = $(MAKEROOT)tmp/
 # If debug is true you kernels will run SLOW (x10 slower) so dont turn on if you
 # don't need it for debug
 DEBUG = false
-QUIET = false
+QUIET = true
 
 # Benchmarking-related
 BENCH_SRC_DIRS = $(sort $(dir $(wildcard ./benchmarks/*/)))
@@ -36,7 +36,7 @@ CUDA_DIR?=/usr/local/cuda
 CUDA_BUILD_DIR=$(CUDA_DIR)/targets/x86_64-linux/
 
 # Source/include directories and setup main target
-SRCDIRS    =  ./src/ $(BENCH_SRC_DIRS)
+SRCDIRS    =  ./src/ ./src/support_classes $(BENCH_SRC_DIRS)
 INCDIRS    =  ./inc/ $(SRCDIRS) $(CUDA_DIR)/samples/common/inc
 SYSINCDIRS =  $(CUDA_BUILD_DIR)include/
 
@@ -275,6 +275,8 @@ $(GPUOBJ_RL)gpurelobjdir.txt:
 
 .PHONY: debug
 debug: $(MAKEFILE)
+	$(ECHO)
+	$(ECHO) Recognized source files
 	$(ECHO) $(FIND_CPP_FILES)
 	$(ECHO) $(FIND_CU_FILES)
 	$(ECHO) $(CPP_FILES)
@@ -283,16 +285,25 @@ debug: $(MAKEFILE)
 	$(ECHO) $(CU_FILE_OBJ)
 	$(ECHO) $(CPP_FILE_DEP)
 	$(ECHO) $(CU_FILE_DEP)
+	$(ECHO)
+	$(ECHO) Dependencies and objects
 	$(ECHO) $(DEPENDS)
 	$(ECHO) $(OBJECTS)
 	$(ECHO) $(GPUOBJECTS)
+	$(ECHO)
+	$(ECHO) Source Directories
+	$(ECHO) $(BENCH_SRC_DIRS)
+	$(ECHO) $(CUDA_DIR)
+	$(ECHO) $(SRCDIRS)
+	$(ECHO) $(INCDIRS)
+	$(ECHO) $(SYSINCDIRS)
+	$(ECHO)
+	$(ECHO) Compiler Information
 	$(ECHO) $(NVCC)
 	$(ECHO) $(CCPP)
-	$(ECHO) $(CUDA_DIR)
 	$(ECHO) $(NVCCBIN)
 	$(ECHO) $(HOST_COMPILER)
 	$(ECHO) $(TARGET_OS)
-
 
 # Cleans up all temporary files, including object files.
 .PHONY: clean
