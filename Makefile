@@ -25,8 +25,8 @@ TMP             = $(MAKEROOT)tmp/
 #**********************************************************************
 # If debug is true you kernels will run SLOW (x10 slower) so dont turn on if you
 # don't need it for debug
-DEBUG = true
-QUIET = true
+DEBUG = false
+QUIET = false
 
 # Benchmarking-related
 BENCH_SRC_DIRS = $(sort $(dir $(wildcard ./benchmarks/*/)))
@@ -209,18 +209,24 @@ $(OBJ)%.o: %.cpp $(MAKEFILE)
 	$(ECHO) -n $(OBJ) 	$(TMP)$(notdir $<).d
 	$(MKDEP) $(CPPDEPFLAGS) $(INCLUDE) $< >	$(TMP)$(notdir $<).d
 	$(ECHO) [$@] from [$<]
+	$(ECHO)
 	$(NVCC) -x cu $(NVCCFLAGS) $(INCLUDE) -dc $(NVCCCC) $< -o $@
+	$(ECHO)
 
 $(GPUOBJ)%.o: %.cu $(MAKEFILE)
 	$(ECHO) [$(notdir $<).d] from [$<]
 	$(ECHO) -n $(GPUOBJ) 	$(TMP)$(notdir $<).d
 	$(MKDEP) $(NVCCDEPFLAGS) $(INCLUDE) $< >	$(TMP)$(notdir $<).d
 	$(ECHO) [$@] from [$<]
+	$(ECHO)
 	$(NVCC) $(NVCCFLAGS) $(INCLUDE) -dc $(NVCCCC) $< -o $@
+	$(ECHO)
 
 $(GPUOBJ_RL)reloc_gpu_objects.o: $(OBJECTS) $(GPUOBJECTS) $(MAKEFILE)
 	$(ECHO) [$@]
+	$(ECHO)
 	$(NVCC) $(NVCCFLAGS) -dlink $(OBJECTS) $(GPUOBJECTS) -o $@
+	$(ECHO)
 
 #**********************************************************************
 # Object Linking and Target Output
@@ -228,7 +234,9 @@ $(GPUOBJ_RL)reloc_gpu_objects.o: $(OBJECTS) $(GPUOBJECTS) $(MAKEFILE)
 
 $(TARGET): $(OBJECTS) $(GPUOBJECTS) $(GPUOBJ_RL)reloc_gpu_objects.o
 	$(ECHO) [$@]
+	$(ECHO)
 	$(CCPP) $(CCPPFLAGS) $(GPUOBJ_RL)reloc_gpu_objects.o $(GPUOBJECTS) $(OBJECTS) $(LADD) -o $@
+	$(ECHO)
 
 # MAKECMDGOALS is a make variable so you don't touch it, it is the target
 ifeq (, $(filter $(MAKECMDGOALS), clean debug))
