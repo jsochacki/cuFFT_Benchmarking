@@ -103,7 +103,9 @@ else
 endif
 
 # Gencode arguments
-SMS ?= 30 35 37 50 52 60 61 70 75
+# SMS ?= 30 35 37 50 52 60 61 70 75
+# V100 only has compute 7.0 so since that is what we are benching now make sure the PTX is in 7.0
+SMS ?= 30 35 37 50 52 60 61 70
 
 ifeq ($(SMS),)
     $(error ERROR - no SM architectures have been specified!)
