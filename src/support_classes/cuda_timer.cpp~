@@ -1,0 +1,263 @@
+#include "GpuTransceiver.h"
+#include "GpuUtils.h"
+
+namespace Support
+{
+   const char* const Transceiver::typeStr[3] = {"transmitter", "receiver",
+                                                "both"};
+
+   GpuTransceiver::GpuTransceiver(std::string _name, XcvrType _type) :
+      Transceiver(_name, _type)
+   {
+      // Create events for profile purposes
+      for(int i = 0; i < PROFILE_EVENT_MAX; i++)
+      {
+         checkCuda(cudaEventCreate(&m_profileEvent[i]));
+      }
+   }
+
+   GpuTransceiver::~GpuTransceiver()
+   {
+      for(int i = 0; i < PROFILE_EVENT_MAX; i++)
+      {
+         checkCuda(cudaEventDestroy(m_profileEvent[i]));
+      }
+
+      if(m_h_debugBuffer != nullptr)
+      {
+         checkCuda(cudaFreeHost(m_h_debugBuffer));
+         m_h_debugBuffer = nullptr;
+      }
+
+      FreeDeviceMem();
+   }
+
+   //! \brief Record time of event completion
+   //!
+   void GpuTransceiver::ProfileEventEx(const char* desc)
+   {
+      if(m_profileNum < PROFILE_EVENT_MAX)
+      {
+         checkCuda(cudaEventRecord(m_profileEvent[m_profileNum], m_gpuStream));
+         m_profileDesc[m_profileNum++] = desc;
+      }
+   }
+
+   cudaError_t GpuTransceiver::ProfileEventEx2(const char* desc)
+   {
+      cudaError_t error;
+      if(m_profileNum < PROFILE_EVENT_MAX)
+      {
+         error = cudaEventRecord(m_profileEvent[m_profileNum], m_gpuStream);
+         if(error != 0)
+            TB_ERROR("ERROR IS %d, in stream %llu", error, m_gpuStream);
+         checkCuda(error);
+         m_profileDesc[m_profileNum++] = desc;
+      }
+      return error;
+   }
+
+   //! \brief Diagnostic routine to obtain the GPU time needed to complete
+   //!  the specified event.
+   //!
+   void GpuTransceiver::ProfileReport()
+   {
+      // Need to wait for last event to finish or you will FATAL with CUDA
+      // runtime error
+      checkCuda(cudaEventSynchronize(m_profileEvent[m_profileNum - 1]));
+      float ms;
+      for(int i = 1; i < m_profileNum; i++)
+      {
+         checkCuda(cudaEventElapsedTime(&ms, m_profileEvent[i - 1], m_profileEvent[i]));
+         TB_INFO("% 20s: %6.5f ms", m_profileDesc[i], ms);
+      }
+   }
+
+   //! \brief Diagnostic routine to obtain the total GPU time needed to complete
+   //!  the most recently scheduled work.
+   //!
+   float GpuTransceiver::TotalTime()
+   {
+      float ms = 0.0;
+      if(m_profileNum > 0)
+      {
+         checkCuda(cudaEventElapsedTime(&ms, m_profileEvent[0],
+                                        m_profileEvent[m_profileNum - 1]));
+      }
+      return ms;
+   }
+
+   //! \brief Setup all HelperSlot and HelperStream resources
+   void GpuTransceiver::SetupHelpers(uint32_t num_streams_in,
+                                     uint32_t num_streams_out,
+                                     uint32_t fft_batch_size,
+                                     bool     batch_fft)
+   {
+      m_helperSlotList =
+          static_cast<HelperSlot*>(calloc(m_helperStreamSlots, sizeof(HelperSlot)));
+      for(uint32_t j = 0; j < m_helperStreamSlots; j++)
+      {
+         // Create stream list for each slot
+         uint32_t beam_in_remain  = num_streams_in;
+         uint32_t beam_out_remain = num_streams_out;
+         m_helperStreams          = static_cast<HelperStream*>(
+             calloc(m_helperStreamCount, sizeof(HelperStream)));
+         for(uint32_t i = 0; i < m_helperStreamCount; i++)
+         {
+            HelperStream* hs = m_helperStreams + i;
+            checkCuda(cudaStreamCreateWithFlags(&hs->m_gpuStream, cudaStreamNonBlocking));
+            checkCuda(cudaEventCreateWithFlags(&hs->m_syncEvent, cudaEventDisableTiming));
+
+            if(batch_fft)
+            {
+               hs->m_beams_in = beam_in_remain / (m_helperStreamCount - i);
+               beam_in_remain = beam_in_remain - hs->m_beams_in;
+               checkCuFFT(cufftPlan1d(&hs->m_fftPlanIn, fft_batch_size,
+                                      CUFFT_C2C, hs->m_beams_in));
+               checkCuFFT(cufftSetStream(hs->m_fftPlanIn, hs->m_gpuStream));
+
+               hs->m_beams_out = beam_out_remain / (m_helperStreamCount - i);
+               beam_out_remain = beam_out_remain - hs->m_beams_out;
+               checkCuFFT(cufftPlan1d(&hs->m_fftPlanOut, fft_batch_size,
+                                      CUFFT_C2C, hs->m_beams_out));
+               checkCuFFT(cufftSetStream(hs->m_fftPlanOut, hs->m_gpuStream));
+            }
+            else
+            {
+               checkCuFFT(cufftPlan1d(&hs->m_fftPlan, fft_batch_size, CUFFT_C2C, 1));
+               checkCuFFT(cufftSetStream(hs->m_fftPlan, hs->m_gpuStream));
+            }
+            cublasStatus_t err = cublasCreate(&hs->m_blas);
+            if(err != CUBLAS_STATUS_SUCCESS)
+            {
+               TB_ERROR("CUBLAS initialization failed");
+            }
+            cublasSetStream(hs->m_blas, hs->m_gpuStream);
+         }
+         m_helperSlotList[j].m_helperStreams = m_helperStreams;
+
+         // Create synchronization events for each slot
+         for(uint8_t i = 0; i < SYNC_EVENT_MAX; i++)
+         {
+            checkCuda(cudaEventCreateWithFlags(
+                &m_helperSlotList[j].m_syncEvent[i], cudaEventDisableTiming));
+         }
+         m_helperSlotList[j].m_syncEventNum = 0;
+      }
+   }
+
+   //! \brief Free all HelperSlot and HelperStream resources
+   void GpuTransceiver::TearDownHelpers(bool batch_fft)
+   {
+      for(uint32_t j = 0; j < m_helperStreamSlots; j++)
+      {
+         for(uint32_t i = 0; i < m_helperStreamCount; i++)
+         {
+            HelperStream* hs = &m_helperSlotList[j].m_helperStreams[i];
+            cublasDestroy(hs->m_blas);
+            if(hs->m_fftPlanIn)
+               checkCuFFT(cufftDestroy(hs->m_fftPlanIn));
+            if(hs->m_fftPlanOut)
+               checkCuFFT(cufftDestroy(hs->m_fftPlanOut));
+            if(hs->m_fftPlan)
+               checkCuFFT(cufftDestroy(hs->m_fftPlan));
+            checkCuda(cudaStreamDestroy(hs->m_gpuStream));
+         }
+         free(m_helperSlotList[j].m_helperStreams);
+         m_helperSlotList[j].m_helperStreams = nullptr;
+
+         for(uint8_t i = 0; i < SYNC_EVENT_MAX; i++)
+         {
+            checkCuda(cudaEventDestroy(m_helperSlotList[j].m_syncEvent[i]));
+         }
+      }
+   }
+
+   //! Synchronize all Helper streams with the main stream
+   void GpuTransceiver::SyncHelpers()
+   {
+      // First, fire off a sync event on each helper stream
+      // and have the main stream wait for each event to complete
+      for(uint32_t i = 0; i < m_helperStreamCount; i++)
+      {
+         HelperStream* hs = m_helperStreams + i;
+         cudaEventRecord(hs->m_syncEvent, hs->m_gpuStream);
+         cudaStreamWaitEvent(m_gpuStream, hs->m_syncEvent, 0);
+      }
+
+      // Now, allocate the next Slot Sync event from the list
+      // This will then be fired on the main stream.
+      uint8_t     idx   = m_helperSlot->m_syncEventNum;
+      cudaEvent_t event = m_helperSlot->m_syncEvent[idx];
+      if(++idx < SYNC_EVENT_MAX)
+      {
+         m_helperSlot->m_syncEventNum = idx;
+      }
+      cudaEventRecord(event, m_gpuStream);
+
+      // Finally, have all helpers wait for this event to be fired
+      // That will ensure they are all back in sync.
+      for(uint32_t i = 0; i < m_helperStreamCount; i++)
+      {
+         cudaStreamWaitEvent(m_helperStreams[i].m_gpuStream, event, 0);
+      }
+   }
+
+   GpuTransceiver::HelperStream* GpuTransceiver::SetNextHelpers(cudaStream_t gpuStream)
+   {
+      // Set the active GPU stream
+      m_gpuStream = gpuStream;
+
+      // Prepare a unique set of helper resources for this slot
+      m_helperSlot    = m_helperSlotList + m_helperSlotNum;
+      m_helperStreams = m_helperSlot->m_helperStreams;
+      m_helperSlotNum = (m_helperSlotNum + 1) % m_helperStreamSlots;
+      m_helperSlot->m_syncEventNum = 0;
+
+      return m_helperStreams;
+   }
+
+   //! \brief Diagnostic routine to create a host memory buffer for the purpose
+   //!  of saving internal memory state information
+   //!
+   void GpuTransceiver::CreateDebugBuffer(size_t size)
+   {
+      checkCuda(cudaHostAlloc(&m_h_debugBuffer, size, cudaHostAllocDefault));
+   }
+
+   //! \brief Diagnostic routine to dump a block of memory to a CSV file
+   void GpuTransceiver::DebugDump(Complex64* src, uint32_t batch_size, uint32_t beam_cnt, const char* filename)
+   {
+      checkCuda(cudaDeviceSynchronize());
+
+      checkCuda(cudaMemcpy(m_h_debugBuffer, src, batch_size * beam_cnt * sizeof(Complex64),
+                           cudaMemcpyDeviceToHost));
+
+      if(m_debugMask & DEBUG_MASK_WRITE_CSV)
+      {
+         FILE* fp;
+
+         fp = fopen(filename, "w");
+         if(fp == NULL)
+         {
+            TB_ERROR("Can't open %s", filename);
+            return;
+         }
+
+         for(uint32_t g = 0; g < batch_size; g++)
+         {
+            for(uint32_t k = 0; k < beam_cnt; k++)
+            {
+               Complex64* ptr = &m_h_debugBuffer[k * batch_size + g];
+               (ptr->i != 0.0) ? fprintf(fp, "%4.2f,", ptr->i)
+                               : fprintf(fp, "   0,");
+               (ptr->q != 0.0) ? fprintf(fp, "%4.2f, ", ptr->q)
+                               : fprintf(fp, "   0, ");
+            }
+            fprintf(fp, "\n");
+         }
+         fclose(fp);
+      }
+   }
+
+}; // namespace Support

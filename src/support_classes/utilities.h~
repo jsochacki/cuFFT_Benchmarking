@@ -1,0 +1,60 @@
+#ifndef UTILITIES_H
+#define UTILITIES_H
+
+#include <stdint.h>
+#include <vector>
+#include <string>
+#include <time.h>
+#include "WorkersCommon.h"
+
+namespace TestBed {
+
+int ReadRealMatrix(float **mat, const std::string file, const uint32_t numRows, const uint32_t numCols);
+int ReadComplexMatrix(float **mat, const char *realFile, const char *imagFile, const uint32_t numRows, const uint32_t numCols, bool alloc);
+int ReadComplexMatrix(Complex64 **mat, const char *cplxFile, const uint32_t numRows, const uint32_t numCols, uint32_t numBands, bool alloc);
+int ReadPnMatrix(float **mat, const char *file, const uint32_t numRows, const uint32_t numCols, uint32_t padSamps, uint32_t reps);
+int ReadComplexMatrixRow(float *x, const char *fn_real, const char *fn_imag, int which_row, int columns);
+int PrepareCorrelation(Complex64 **h_buf, const Complex64 *in, uint32_t len, int32_t lag);
+int ReadBinarySampleFile(char **h_buf, const char *filename, int rows, int columns, int samp_size, bool alloc);
+double ConvertTimespecToMilliseconds(struct timespec &t);
+
+AddrInfo *BuildAddrList(std::string &ip, std::string &mac, uint16_t port);
+AddrInfo *BuildAddrList(std::vector<std::string> &ips, std::vector<std::string> &macs, uint16_t port);
+AddrInfo* BuildAddrList(uint32_t ip, uint8_t mac[], uint16_t port);
+TxStreamDestList *BuildDestList(std::vector<std::string> &ips, std::vector<std::string> &macs, uint16_t port);
+TxStreamDestList *BuildDestList(int out_streams, std::vector<std::vector<std::string>> &tx_ips, std::vector<std::vector<std::string>> &tx_macs, uint16_t port);
+
+inline ThirtyTwoBitComplexOffsetB ThirtyTwoBitComplexOffsetB_ntoh(const ThirtyTwoBitComplexOffsetB& x)
+{
+   ThirtyTwoBitComplexOffsetB y;
+   y.q = (x.q>>8) | ((x.q&0xff)<<8);
+   y.i = (x.i>>8) | ((x.i&0xff)<<8);
+   return y;
+}
+
+inline ThirtyTwoBitComplexOffsetB ThirtyTwoBitComplexOffsetB_hton(const ThirtyTwoBitComplexOffsetB& x)
+{
+   // They just happen to be the same transform, so no code duplication
+   return ThirtyTwoBitComplexOffsetB_ntoh(x);
+}
+
+template <typename T>
+T next_power_of_2(T v)
+{
+    v += (v == 0);
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;    //for uint8_t data : sizeof(input_data) == 1
+    if(sizeof(T) >= 2U) v |= v >> 8;    //for uint16_t data : sizeof(input_data) == 2
+    if(sizeof(T) >= 4U) v |= v >> 16;  //for uint32_t data : sizeof(input_data) == 4
+    if(sizeof(T) >= 8U) v |= v >> 32;  //for uint64_t data : sizeof(input_data) == 8
+    v++;
+    return v;
+}
+
+std::string str_toupper(std::string s);
+
+};
+
+#endif

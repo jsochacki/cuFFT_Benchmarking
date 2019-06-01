@@ -36,7 +36,7 @@ CUDA_DIR?=/usr/local/cuda
 CUDA_BUILD_DIR=$(CUDA_DIR)/targets/x86_64-linux/
 
 # Source/include directories and setup main target
-SRCDIRS    =  ./src/ ./src/support_classes $(BENCH_SRC_DIRS)
+SRCDIRS    =  ./src/ ./src/support_classes/ $(BENCH_SRC_DIRS)
 INCDIRS    =  ./inc/ $(SRCDIRS) $(CUDA_DIR)/samples/common/inc
 SYSINCDIRS =  $(CUDA_BUILD_DIR)include/
 

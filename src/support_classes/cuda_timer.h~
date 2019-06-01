@@ -1,0 +1,169 @@
+#ifndef CUDA_TIMER_H
+#define CUDA_TIMER_H
+
+#include <cublas_v2.h>
+#include <cufft.h>
+#include <numeric>
+
+#include "GPUManager.h"
+#include "Transceiver.h"
+
+namespace Support
+{
+   class GpuTransceiver : public Transceiver // ABC
+   {
+      public:
+      GpuTransceiver(std::string _name, XcvrType _type);
+      ~GpuTransceiver();
+      virtual int Init() = 0;
+
+      virtual void FreeDeviceMem() { gpuMgr.FreeDeviceMem(GetWholeName()); }
+      virtual void FreeDeviceStreams()
+      {
+         gpuMgr.FreeDeviceStreams(GetWholeName());
+      }
+      virtual void Cleanup(bool quiet = false) { gpuMgr.Cleanup(quiet); }
+      int          GPUAlloc(void** devPtr, size_t size)
+      {
+         ttlDeviceMem += size;
+         return gpuMgr.DeviceAlloc(devPtr, size, GetWholeName());
+      };
+      int GPUAllocPitch(void** devPtr, size_t* pitch, size_t width, size_t height)
+      {
+         return gpuMgr.DeviceAllocPitch(devPtr, pitch, width, height, GetWholeName());
+      }
+      int GPUCreateStream(cudaStream_t* pStream)
+      {
+         return gpuMgr.CreateStream(pStream, GetWholeName());
+      }
+
+      void  ProfileEnable(bool enable) { m_profileEnable = enable; }
+      void  ProfileReport();
+      float TotalTime();
+
+      typedef uint16_t        DEBUG_MASK;
+      static const DEBUG_MASK DEBUG_MASK_NONE       = 0x0000;
+      static const DEBUG_MASK DEBUG_MASK_WRITE_CSV  = 0x8000;
+      static const DEBUG_MASK DEBUG_MASK_EVERYTHING = 0xffff;
+
+      void SetDebugMask(DEBUG_MASK mask) { m_debugMask = mask; }
+
+      static float SumTime(float info[], uint32_t total)
+      {
+         float ttl = 0;
+         return accumulate(info, info + total, ttl);
+      }
+
+      uint8_t GetEventCount() { return m_profileNum; }
+      void    SetStream(cudaStream_t pStream) { m_gpuStream = pStream; }
+
+      // This structure is used to manage multiple helper streams
+      // This allows FFTs and Matrix muliplies to occur in parallel
+      typedef struct
+      {
+         cudaStream_t   m_gpuStream;
+         cudaEvent_t    m_syncEvent;
+         uint32_t       m_beams_in;
+         uint32_t       m_beams_out;
+         cufftHandle    m_fftPlan;   // Used for non-batch FFT case
+         cufftHandle    m_fftPlanIn; // Used for batched FFT Case
+         cufftHandle    m_fftPlanOut;
+         cublasHandle_t m_blas;
+      } HelperStream;
+
+      // This structure is used to synchronize the helper streams
+      // at various points during beam forming.  For example, we
+      // don't want sub-band operations to start before all FFTs
+      // are complete.  There are several of these objects, which
+      // are alternated on each slot to prevent problems during
+      // slot overlaps.
+      static const uint8_t SYNC_EVENT_MAX = 8;
+      typedef struct
+      {
+         HelperStream* m_helperStreams;
+         uint8_t       m_syncEventNum = 0;
+         cudaEvent_t   m_syncEvent[SYNC_EVENT_MAX];
+      } HelperSlot;
+
+      // Active Slot and Helper - these are updated each time
+      // a new slot is being processed, just for convienence
+      HelperSlot*   m_helperSlot;
+      HelperStream* m_helperStreams;
+
+      // This is were the actual list of helper slots are maintained
+      HelperSlot* m_helperSlotList;
+      uint32_t    m_helperSlotNum     = 0;
+      uint32_t    m_helperStreamCount = 2;
+      uint32_t    m_helperStreamSlots = 3;
+
+      void          SetupHelpers(uint32_t num_streams_in,
+                                 uint32_t num_streams_out,
+                                 uint32_t fft_batch_size,
+                                 bool     batch_fft);
+      void          TearDownHelpers(bool batch_fft);
+      void          SyncHelpers();
+      HelperStream* SetNextHelpers(cudaStream_t gpuStream);
+
+      protected:
+      inline void        ProfileEventStart();
+      inline cudaError_t ProfileEventStart2();
+      inline void        ProfileEvent(const char* desc);
+      inline cudaError_t ProfileEvent2(const char* desc);
+
+      void CreateDebugBuffer(size_t size);
+      void DebugDump(Complex64* src, uint32_t batch_size, uint32_t beam_cnt, const char* filename);
+
+      private:
+      void        ProfileEventEx(const char* desc);
+      cudaError_t ProfileEventEx2(const char* desc);
+
+      protected:
+      cudaStream_t m_gpuStream;
+
+      // Deprecated - moved to GPU Manager
+      uint32_t ttlDeviceMem;
+      uint32_t ttlHostMem;
+
+      GPUManager& gpuMgr = GPUManager::Instance();
+
+      // Profile Events
+      static const int PROFILE_EVENT_MAX = 25;
+      bool             m_profileEnable   = false;
+      uint8_t          m_profileNum      = 0;
+      const char*      m_profileDesc[PROFILE_EVENT_MAX];
+      cudaEvent_t      m_profileEvent[PROFILE_EVENT_MAX];
+
+      // Debug Support
+      DEBUG_MASK m_debugMask     = 0;
+      Complex64* m_h_debugBuffer = nullptr;
+   };
+
+   inline void GpuTransceiver::ProfileEvent(const char* desc)
+   {
+      if(m_profileEnable)
+         ProfileEventEx(desc);
+   }
+
+   inline cudaError_t GpuTransceiver::ProfileEvent2(const char* desc)
+   {
+      cudaError_t error = cudaSuccess;
+      if(m_profileEnable)
+         error = (ProfileEventEx2(desc));
+      return error;
+   }
+
+   inline void GpuTransceiver::ProfileEventStart()
+   {
+      m_profileNum = 0;
+      ProfileEvent("Start");
+   }
+
+   inline cudaError_t GpuTransceiver::ProfileEventStart2()
+   {
+      m_profileNum = 0;
+      return (ProfileEvent2("Start"));
+   }
+
+}; // namespace Support
+
+#endif /* CUDA_TIMER_H */

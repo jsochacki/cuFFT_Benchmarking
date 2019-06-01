@@ -1,0 +1,42 @@
+#pragma once
+
+#include "Utilities.h"
+#include "TestBedLogger.h"
+#include "WorkersCommon.h"
+
+#define CHECK_ALLOC(x) if ((x) == NULL) { TB_FATAL("Failed to allocate"); }
+
+using namespace std;
+
+namespace TestBed
+{
+    typedef enum
+    {
+        TYPE_TRANSMITTER,
+        TYPE_RECEIVER,
+        TYPE_BOTH
+    } XcvrType;
+
+
+    class Transceiver // ABC
+    {
+        public:
+            Transceiver(std::string _name, XcvrType _type) :
+               type(_type)
+               ,moduleName(_name)
+               {}
+            virtual ~Transceiver() {}
+            virtual int Init() = 0;
+            std::string GetModuleName(void) { return moduleName; }
+            std::string GetXcvrName(void) { return xcvrName; }
+            std::string GetWholeName(void) { return moduleName + ":" + xcvrName; }
+
+            static const char * const typeStr[3];
+        protected:
+            XcvrType type;
+            uint32_t curMem;
+            std::string moduleName;
+            std::string xcvrName;
+    };
+
+};
