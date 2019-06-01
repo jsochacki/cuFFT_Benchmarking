@@ -5,12 +5,12 @@
 #include <cufft.h>
 #include <numeric>
 
-#include "GPUManager.h"
-#include "Transceiver.h"
+#include "Gpu_manager.h"
+#include "Module.h"
 
 namespace Support
 {
-   class GpuTransceiver : public Transceiver // ABC
+   class GpuTransceiver : public ABCS::Module // ABC
    {
       public:
       GpuTransceiver(std::string _name, XcvrType _type);

@@ -20,23 +20,23 @@ namespace Management
    } AllocInfo;
 
    /**
-    * \class gpu_manager
+    * \class Gpu_manager
     *
     * \brief Manages GPU resources
     *
-    *  The gpu_manager tracks resource allocations on all GPUs in the system.
+    *  The Gpu_manager tracks resource allocations on all GPUs in the system.
     * Resources include memory, streams, handles, plans, etc. It acts similar to
-    * a smart pointer in that the gpu_manager owns the deallocation of each
+    * a smart pointer in that the Gpu_manager owns the deallocation of each
     * resource, and not the thread that created them. The threads are only
     * required to call the allocation functions, and those allocations are
-    * registered by their respective types. Nothing the gpu_manager does is
+    * registered by their respective types. Nothing the Gpu_manager does is
     * intended to be used in the fast path. Allocations use a mutex to do the
     * bookeeping, so they should not be done for time-critical functions.
     */
-   class gpu_manager
+   class Gpu_manager
    {
       public:
-      static gpu_manager& Instance();
+      static Gpu_manager& Instance();
 
       int SetDevice(uint8_t device);
 
@@ -56,8 +56,8 @@ namespace Management
       bool IsClean(void);
 
       private:
-      gpu_manager(){};
-      ~gpu_manager(){};
+      Gpu_manager(){};
+      ~Gpu_manager(){};
 
       std::mutex alloc_lock;
 

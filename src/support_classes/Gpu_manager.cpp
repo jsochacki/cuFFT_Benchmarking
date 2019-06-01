@@ -1,10 +1,10 @@
-#include "gpu_manager.h"
+#include "Gpu_manager.h"
 
 namespace Management
 {
-   gpu_manager& gpu_manager::Instance()
+   Gpu_manager& Gpu_manager::Instance()
    {
-      static gpu_manager instance;
+      static Gpu_manager instance;
       return instance;
    }
 
@@ -12,12 +12,12 @@ namespace Management
    //! //-in device - Device ID to set to (0-15)
    //!
    //! //-out - non-zero value indicates fatal error
-   int gpu_manager::SetDevice(uint8_t device)
+   int Gpu_manager::SetDevice(uint8_t device)
    {
       cudaError_t err = cudaSetDevice(device);
       if(err != cudaSuccess)
       {
-         printf("FATAL ERROR: Failed to set CUDA device to %u", device);
+         printf("FATAL ERROR: Failed to set CUDA device to %u\n", device);
          return -1;
       }
 
@@ -30,14 +30,14 @@ namespace Management
    //!
    //! //-out devPtr - Pointer address where memory is stored
    //! //-out - non-zero value indicates fatal error
-   int gpu_manager::DeviceAlloc(void** devPtr, size_t size, std::string name)
+   int Gpu_manager::DeviceAlloc(void** devPtr, size_t size, std::string name)
    {
       cudaError_t err;
 
       err = cudaMalloc(devPtr, size);
       if(err != cudaSuccess)
       {
-         printf("FATAL ERROR: cudaMalloc Error: %s from %s",
+         printf("FATAL ERROR: cudaMalloc Error: %s from %s\n",
                 cudaGetErrorString(err), name.c_str());
          return -1;
       }
@@ -47,7 +47,7 @@ namespace Management
       int device;
       if(cudaGetDevice(&device) != cudaSuccess)
       {
-         printf("FATAL ERROR: Failed to get CUDA device ID for name %s", name.c_str());
+         printf("FATAL ERROR: Failed to get CUDA device ID for name %s\n", name.c_str());
          return -1;
       }
 
@@ -63,14 +63,14 @@ namespace Management
    //! //-out devPtr - Pointer address where memory is stored
    //! //-out pitch - Actual width of allocation in bytes
    //! //-out - non-zero value indicates fatal error
-   int gpu_manager::DeviceAllocPitch(void** devPtr, size_t* pitch, size_t width, size_t height, std::string name)
+   int Gpu_manager::DeviceAllocPitch(void** devPtr, size_t* pitch, size_t width, size_t height, std::string name)
    {
       cudaError_t err;
 
       err = cudaMallocPitch(devPtr, pitch, width, height);
       if(err != cudaSuccess)
       {
-         printf("FATAL ERROR: cudaMallocPitch Error: %s from %s",
+         printf("FATAL ERROR: cudaMallocPitch Error: %s from %s\n",
                 cudaGetErrorString(err), name.c_str());
          return -1;
       }
@@ -80,7 +80,7 @@ namespace Management
       int device;
       if(cudaGetDevice(&device) != cudaSuccess)
       {
-         printf("FATAL ERROR: Failed to get CUDA device ID for %s", name.c_str());
+         printf("FATAL ERROR: Failed to get CUDA device ID for %s\n", name.c_str());
          return -1;
       }
 
@@ -93,12 +93,12 @@ namespace Management
    //!
    //! //-out pStream - Pointer address where the stream is stored
    //! //-out - non-zero value indicates fatal error
-   int gpu_manager::CreateStream(cudaStream_t* pStream, std::string name)
+   int Gpu_manager::CreateStream(cudaStream_t* pStream, std::string name)
    {
       cudaError_t err = cudaStreamCreate(pStream);
       if(err != cudaSuccess)
       {
-         printf("FATAL ERROR: cudaStreamCreate Error: %s from %s",
+         printf("FATAL ERROR: cudaStreamCreate Error: %s from %s\n",
                 cudaGetErrorString(err), name.c_str());
          return -1;
       }
@@ -107,7 +107,7 @@ namespace Management
       int                          device;
       if(cudaGetDevice(&device) != cudaSuccess)
       {
-         printf("FATAL ERROR: Failed to get CUDA device ID for %s", name.c_str());
+         printf("FATAL ERROR: Failed to get CUDA device ID for %s\n", name.c_str());
          return -1;
       }
 
@@ -115,10 +115,10 @@ namespace Management
    }
 
    //! \brief Free device memory from a single user
-   //! //-in name - of module or ALL to free all memory the gpu_manager controls
+   //! //-in name - of module or ALL to free all memory the Gpu_manager controls
    //!
    //! //-out - none
-   void gpu_manager::FreeDeviceMem(std::string name)
+   void Gpu_manager::FreeDeviceMem(std::string name)
    {
       std::unique_lock<std::mutex> local_lock(alloc_lock);
       for(auto it = dalloc_map.cbegin(); it != dalloc_map.cend();)
@@ -146,7 +146,7 @@ namespace Management
             {
                printf(
                    "DEBUG: Freed all device memory from GPU manager (%.2fMB "
-                   "freed)",
+                   "freed)\n",
                    cnt / 1e6);
             }
             else
@@ -154,7 +154,7 @@ namespace Management
                printf(
                    "DEBUG: Freed all device memory for %s from GPU manager "
                    "(%.2fMB "
-                   "freed)",
+                   "freed)\n",
                    name.c_str(), cnt / 1e6);
             }
          }
@@ -170,7 +170,7 @@ namespace Management
    //! //-in ptr - pointer to free
    //!
    //! //-out - none
-   void gpu_manager::FreeDeviceMem(const std::string name, void* ptr)
+   void Gpu_manager::FreeDeviceMem(const std::string name, void* ptr)
    {
       std::unique_lock<std::mutex> local_lock(alloc_lock);
       for(auto it = dalloc_map.cbegin(); it != dalloc_map.cend();)
@@ -191,19 +191,19 @@ namespace Management
          }
       }
 
-      printf("NON-FATAL ERROR: Pointer %p not found with name %s", ptr, name.c_str());
+      printf("NON-FATAL ERROR: Pointer %p not found with name %s\n", ptr, name.c_str());
    }
 
    //! \brief Free device streams allocated on GPU
    //! //-in name - of module to free all streams on
    //!
    //! //-out - none
-   void gpu_manager::FreeDeviceStreams(std::string name)
+   void Gpu_manager::FreeDeviceStreams(std::string name)
    {
       if(name == "ALL")
       {
          FreeStreams();
-         printf("DEBUG: Freed all GPU streams.");
+         printf("DEBUG: Freed all GPU streams.\n");
       }
       else
       {
@@ -219,7 +219,7 @@ namespace Management
                }
                dstream_map.erase(it++);
 
-               printf("DEBUG: Freed all streams for %s from GPU manager", name.c_str());
+               printf("DEBUG: Freed all streams for %s from GPU manager\n", name.c_str());
             }
             else
             {
@@ -234,7 +234,7 @@ namespace Management
    //! //-in s - stream
    //!
    //! //-out - none
-   void gpu_manager::FreeStream(std::string name, cudaStream_t s)
+   void Gpu_manager::FreeStream(std::string name, cudaStream_t s)
    {
       std::unique_lock<std::mutex> local_lock(alloc_lock);
       for(auto it = dstream_map.cbegin(); it != dstream_map.cend(); it++)
@@ -253,14 +253,14 @@ namespace Management
          }
       }
 
-      printf("NON-FATAL ERROR: Couldn't find stream to delete for name %s", name.c_str());
+      printf("NON-FATAL ERROR: Couldn't find stream to delete for name %s\n", name.c_str());
    }
 
    //! \brief Free all streams allocated on GPU
    //! //-note frees all streams on gpus that have streams in the dstream_map
    //!
    //! //-out - none
-   void gpu_manager::FreeStreams(void)
+   void Gpu_manager::FreeStreams(void)
    {
       std::unique_lock<std::mutex> local_lock(alloc_lock);
       for(auto it = dstream_map.cbegin(); it != dstream_map.cend();)
@@ -277,42 +277,42 @@ namespace Management
    //! \brief Prints information about each GPU device
    //!
    //! //-out - none
-   void gpu_manager::PrintDeviceInfo(void)
+   void Gpu_manager::PrintDeviceInfo(void)
    {
       int numGpus = 0;
       cudaGetDeviceCount(&numGpus);
 
-      printf("*** %d GPU devices found ***", numGpus);
+      printf("*** %d GPU devices found ***\n", numGpus);
       for(uint32_t i = 0; i < numGpus; i++)
       {
          cudaDeviceProp p;
          cudaGetDeviceProperties(&p, i);
-         printf("GPU Device %u", i);
-         printf("   Name: %s", p.name);
-         printf("   Compute Capability: %u.%u", p.major, p.minor);
-         printf("   Mem Clock (MHz): %.0f", p.memoryClockRate / 1e3);
-         printf("   Mem Bus Width (bits): %d", p.memoryBusWidth);
-         printf("   Shared Memory Per Block: %zu bytes", p.sharedMemPerBlock);
-         printf("   Peak Memory Bandwidth (GB/s): %.0f",
+         printf("GPU Device %u\n", i);
+         printf("   Name: %s\n", p.name);
+         printf("   Compute Capability: %u.%u\n", p.major, p.minor);
+         printf("   Mem Clock (MHz): %.0f\n", p.memoryClockRate / 1e3);
+         printf("   Mem Bus Width (bits): %d\n", p.memoryBusWidth);
+         printf("   Shared Memory Per Block: %zu bytes\n", p.sharedMemPerBlock);
+         printf("   Peak Memory Bandwidth (GB/s): %.0f\n",
                 2.0 * p.memoryClockRate * (p.memoryBusWidth / 8) / 1.0e6);
-         printf("   Total Mem (GB): %.2f", p.totalGlobalMem / 1e9);
-         printf("   SM Count: %d", p.multiProcessorCount);
-         printf("   SM Clock (MHz): %.0f", p.clockRate / 1e3);
-         printf("   ECC Enabled: %d", p.ECCEnabled);
+         printf("   Total Mem (GB): %.2f\n", p.totalGlobalMem / 1e9);
+         printf("   SM Count: %d\n", p.multiProcessorCount);
+         printf("   SM Clock (MHz): %.0f\n", p.clockRate / 1e3);
+         printf("   ECC Enabled: %d\n", p.ECCEnabled);
       }
    }
 
    //! \brief Prints total memory useage and module allocations
    //!
-   void gpu_manager::PrintResourceUsage(void)
+   void Gpu_manager::PrintResourceUsage(void)
    {
-      printf("NOTICE: Total memory allocation per GPU:");
+      printf("NOTICE: Total memory allocation per GPU:\n");
       for(auto& i : d_ttl_alloc)
       {
-         printf("NOTICE: Device %2u: %.2fMB", i.first, i.second / 1e6);
+         printf("NOTICE: Device %2u: %.2fMB\n", i.first, i.second / 1e6);
       }
 
-      printf("NOTICE: Memory allocation per core:");
+      printf("NOTICE: Memory allocation per core:\n");
       for(auto& i : dalloc_map)
       {
          uint64_t ttl = 0;
@@ -322,14 +322,14 @@ namespace Management
             ttl += n.size;
             cnt++;
          }
-         printf("NOTICE: Object %s on device %2u: %.2fMB over %u allocations",
+         printf("NOTICE: Object %s on device %2u: %.2fMB over %u allocations\n",
                 i.first.first.c_str(), i.first.second, ttl / 1e6, cnt);
       }
 
-      printf("NOTICE: Total streams used:");
+      printf("NOTICE: Total streams used:\n");
       for(auto& i : dstream_map)
       {
-         printf("NOTICE: Object %s on device %2u: %zu streams",
+         printf("NOTICE: Object %s on device %2u: %zu streams\n",
                 i.first.first.c_str(), i.first.second, i.second.size());
       }
    }
@@ -337,11 +337,11 @@ namespace Management
    //! \brief Clean up all resources
    //!
    //! //-out - non-zero value indicates fatal error
-   void gpu_manager::Cleanup(bool quiet)
+   void Gpu_manager::Cleanup(bool quiet)
    {
       if(!quiet)
       {
-         printf("Freeing all device memory");
+         printf("Freeing all device memory\n");
       }
       FreeDeviceMem();
       FreeStreams();
@@ -350,14 +350,14 @@ namespace Management
    //! \brief Check if all resources have been cleaned up
    //!
    //! //-out - true if no gpu resources are allocated at the moment
-   bool gpu_manager::IsClean(void)
+   bool Gpu_manager::IsClean(void)
    {
       std::unique_lock<std::mutex> local_lock(alloc_lock);
       if(dalloc_map.empty() && dstream_map.empty() && d_ttl_alloc.empty())
       {
          return true;
       }
-      printf("NOTICE: GPU Manager is not clean.");
+      printf("NOTICE: GPU Manager is not clean.\n");
       PrintResourceUsage();
       return false;
    }

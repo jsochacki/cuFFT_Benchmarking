@@ -3,11 +3,10 @@
 
 namespace Support
 {
-   const char* const Transceiver::typeStr[3] = {"transmitter", "receiver",
-                                                "both"};
+   const char* const Module::typeStr[3] = {"transmitter", "receiver", "both"};
 
    GpuTransceiver::GpuTransceiver(std::string _name, XcvrType _type) :
-      Transceiver(_name, _type)
+      Module(_name, _type)
    {
       // Create events for profile purposes
       for(int i = 0; i < PROFILE_EVENT_MAX; i++)
