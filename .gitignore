@@ -19,3 +19,4 @@ executible
 # VSCODE Generated
 *.bin
 *.ipch
+settings.json
