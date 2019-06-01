@@ -1,8 +1,6 @@
 #ifndef CUDA_TIMER_H
 #define CUDA_TIMER_H
 
-#include <cublas_v2.h>
-#include <cufft.h>
 #include <numeric>
 
 #include "Gpu_manager.h"
@@ -10,11 +8,12 @@
 
 namespace Support
 {
-   class GpuTransceiver : public ABCS::Module // ABC
+   class Cuda_timer : public ABCS::Module // ABC
    {
       public:
-      GpuTransceiver(std::string _name, XcvrType _type);
-      ~GpuTransceiver();
+      Cuda_timer(std::string _name, module_type _type);
+      ~Cuda_timer();
+
       virtual int Init() = 0;
 
       virtual void FreeDeviceMem() { gpuMgr.FreeDeviceMem(GetWholeName()); }
@@ -57,53 +56,6 @@ namespace Support
       uint8_t GetEventCount() { return m_profileNum; }
       void    SetStream(cudaStream_t pStream) { m_gpuStream = pStream; }
 
-      // This structure is used to manage multiple helper streams
-      // This allows FFTs and Matrix muliplies to occur in parallel
-      typedef struct
-      {
-         cudaStream_t   m_gpuStream;
-         cudaEvent_t    m_syncEvent;
-         uint32_t       m_beams_in;
-         uint32_t       m_beams_out;
-         cufftHandle    m_fftPlan;   // Used for non-batch FFT case
-         cufftHandle    m_fftPlanIn; // Used for batched FFT Case
-         cufftHandle    m_fftPlanOut;
-         cublasHandle_t m_blas;
-      } HelperStream;
-
-      // This structure is used to synchronize the helper streams
-      // at various points during beam forming.  For example, we
-      // don't want sub-band operations to start before all FFTs
-      // are complete.  There are several of these objects, which
-      // are alternated on each slot to prevent problems during
-      // slot overlaps.
-      static const uint8_t SYNC_EVENT_MAX = 8;
-      typedef struct
-      {
-         HelperStream* m_helperStreams;
-         uint8_t       m_syncEventNum = 0;
-         cudaEvent_t   m_syncEvent[SYNC_EVENT_MAX];
-      } HelperSlot;
-
-      // Active Slot and Helper - these are updated each time
-      // a new slot is being processed, just for convienence
-      HelperSlot*   m_helperSlot;
-      HelperStream* m_helperStreams;
-
-      // This is were the actual list of helper slots are maintained
-      HelperSlot* m_helperSlotList;
-      uint32_t    m_helperSlotNum     = 0;
-      uint32_t    m_helperStreamCount = 2;
-      uint32_t    m_helperStreamSlots = 3;
-
-      void          SetupHelpers(uint32_t num_streams_in,
-                                 uint32_t num_streams_out,
-                                 uint32_t fft_batch_size,
-                                 bool     batch_fft);
-      void          TearDownHelpers(bool batch_fft);
-      void          SyncHelpers();
-      HelperStream* SetNextHelpers(cudaStream_t gpuStream);
-
       protected:
       inline void        ProfileEventStart();
       inline cudaError_t ProfileEventStart2();
@@ -138,13 +90,13 @@ namespace Support
       Complex64* m_h_debugBuffer = nullptr;
    };
 
-   inline void GpuTransceiver::ProfileEvent(const char* desc)
+   inline void Cuda_timer::ProfileEvent(const char* desc)
    {
       if(m_profileEnable)
          ProfileEventEx(desc);
    }
 
-   inline cudaError_t GpuTransceiver::ProfileEvent2(const char* desc)
+   inline cudaError_t Cuda_timer::ProfileEvent2(const char* desc)
    {
       cudaError_t error = cudaSuccess;
       if(m_profileEnable)
@@ -152,13 +104,13 @@ namespace Support
       return error;
    }
 
-   inline void GpuTransceiver::ProfileEventStart()
+   inline void Cuda_timer::ProfileEventStart()
    {
       m_profileNum = 0;
       ProfileEvent("Start");
    }
 
-   inline cudaError_t GpuTransceiver::ProfileEventStart2()
+   inline cudaError_t Cuda_timer::ProfileEventStart2()
    {
       m_profileNum = 0;
       return (ProfileEvent2("Start"));
