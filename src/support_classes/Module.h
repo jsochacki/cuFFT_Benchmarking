@@ -32,9 +32,9 @@ namespace ABCS
       static const char* const typeStr[3];
 
       protected:
-      module_type type                  = TYPE_BOTH;
-      uint32_t    current_host_memory   = 0;
-      uint32_t    current_device_memory = 0;
+      module_type type                        = TYPE_BOTH;
+      uint32_t    current_total_host_memory   = 0;
+      uint32_t    current_total_device_memory = 0;
       std::string module_name("");
       std::string instance_name("");
    };

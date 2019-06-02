@@ -1,5 +1,4 @@
-#include "Cuda_timer.h"
-
+#include "Benchmark_manager.h"
 #include "GpuUtils.h"
 
 namespace Support
@@ -7,7 +6,7 @@ namespace Support
    const char* const ABSCS::Module::typeStr[3] = {"transmitter", "receiver",
                                                   "both"};
 
-   Cuda_timer::Cuda_timer(std::string _name, module_type _type) :
+   Benchmark_manager::Benchmark_manager(std::string _name, module_type _type) :
       Module(_name, _type)
    {
       // Create events for profile purposes
@@ -17,7 +16,7 @@ namespace Support
       }
    }
 
-   Cuda_timer::~Cuda_timer()
+   Benchmark_manager::~Benchmark_manager()
    {
       for(int i = 0; i < PROFILE_EVENT_MAX; i++)
       {
@@ -35,7 +34,7 @@ namespace Support
 
    //! \brief Record time of event completion
    //!
-   void Cuda_timer::ProfileEventEx(const char* desc)
+   void Benchmark_manager::ProfileEventEx(const char* desc)
    {
       if(m_profileNum < PROFILE_EVENT_MAX)
       {
@@ -44,7 +43,7 @@ namespace Support
       }
    }
 
-   cudaError_t Cuda_timer::ProfileEventEx2(const char* desc)
+   cudaError_t Benchmark_manager::ProfileEventEx2(const char* desc)
    {
       cudaError_t error;
       if(m_profileNum < PROFILE_EVENT_MAX)
@@ -61,7 +60,7 @@ namespace Support
    //! \brief Diagnostic routine to obtain the GPU time needed to complete
    //!  the specified event.
    //!
-   void Cuda_timer::ProfileReport()
+   void Benchmark_manager::ProfileReport()
    {
       // Need to wait for last event to finish or you will FATAL with CUDA
       // runtime error
@@ -77,7 +76,7 @@ namespace Support
    //! \brief Diagnostic routine to obtain the total GPU time needed to complete
    //!  the most recently scheduled work.
    //!
-   float Cuda_timer::TotalTime()
+   float Benchmark_manager::TotalTime()
    {
       float ms = 0.0;
       if(m_profileNum > 0)
@@ -91,13 +90,16 @@ namespace Support
    //! \brief Diagnostic routine to create a host memory buffer for the purpose
    //!  of saving internal memory state information
    //!
-   void Cuda_timer::CreateDebugBuffer(size_t size)
+   void Benchmark_manager::CreateDebugBuffer(size_t size)
    {
       checkCuda(cudaHostAlloc(&m_h_debugBuffer, size, cudaHostAllocDefault));
    }
 
    //! \brief Diagnostic routine to dump a block of memory to a CSV file
-   void Cuda_timer::DebugDump(Complex64* src, uint32_t batch_size, uint32_t beam_cnt, const char* filename)
+   void Benchmark_manager::DebugDump(Complex64*  src,
+                                     uint32_t    batch_size,
+                                     uint32_t    beam_cnt,
+                                     const char* filename)
    {
       checkCuda(cudaDeviceSynchronize());
 

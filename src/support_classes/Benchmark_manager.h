@@ -8,23 +8,17 @@
 
 namespace Support
 {
-   class Cuda_timer : public ABCS::Module // ABC
+   class Benchmark_manager : public ABCS::Module // ABC
    {
       public:
-      Cuda_timer(std::string _name, module_type _type);
-      ~Cuda_timer();
+      Benchmark_manager(std::string _name, module_type _type);
+      ~Benchmark_manager();
 
       virtual int Init() = 0;
 
-      virtual void FreeDeviceMem() { gpuMgr.FreeDeviceMem(GetWholeName()); }
-      virtual void FreeDeviceStreams()
+      int GPUAlloc(void** devPtr, size_t size)
       {
-         gpuMgr.FreeDeviceStreams(GetWholeName());
-      }
-      virtual void Cleanup(bool quiet = false) { gpuMgr.Cleanup(quiet); }
-      int          GPUAlloc(void** devPtr, size_t size)
-      {
-         ttlDeviceMem += size;
+         local_device_memory += size;
          return gpuMgr.DeviceAlloc(devPtr, size, GetWholeName());
       };
       int GPUAllocPitch(void** devPtr, size_t* pitch, size_t width, size_t height)
@@ -35,17 +29,20 @@ namespace Support
       {
          return gpuMgr.CreateStream(pStream, GetWholeName());
       }
+      virtual void FreeDeviceMem() { gpuMgr.FreeDeviceMem(GetWholeName()); }
+      virtual void FreeDeviceStreams()
+      {
+         gpuMgr.FreeDeviceStreams(GetWholeName());
+      }
+      virtual void Cleanup(bool quiet = false) { gpuMgr.Cleanup(quiet); }
+
+      void    SetStream(cudaStream_t pStream) { m_gpuStream = pStream; }
+      void    SetDebugMask(DEBUG_MASK mask) { m_debugMask = mask; }
+      uint8_t GetEventCount() { return m_profileNum; }
 
       void  ProfileEnable(bool enable) { m_profileEnable = enable; }
       void  ProfileReport();
       float TotalTime();
-
-      typedef uint16_t        DEBUG_MASK;
-      static const DEBUG_MASK DEBUG_MASK_NONE       = 0x0000;
-      static const DEBUG_MASK DEBUG_MASK_WRITE_CSV  = 0x8000;
-      static const DEBUG_MASK DEBUG_MASK_EVERYTHING = 0xffff;
-
-      void SetDebugMask(DEBUG_MASK mask) { m_debugMask = mask; }
 
       static float SumTime(float info[], uint32_t total)
       {
@@ -53,8 +50,10 @@ namespace Support
          return accumulate(info, info + total, ttl);
       }
 
-      uint8_t GetEventCount() { return m_profileNum; }
-      void    SetStream(cudaStream_t pStream) { m_gpuStream = pStream; }
+      typedef uint16_t        DEBUG_MASK;
+      static const DEBUG_MASK DEBUG_MASK_NONE       = 0x0000;
+      static const DEBUG_MASK DEBUG_MASK_WRITE_CSV  = 0x8000;
+      static const DEBUG_MASK DEBUG_MASK_EVERYTHING = 0xffff;
 
       protected:
       inline void        ProfileEventStart();
@@ -72,9 +71,8 @@ namespace Support
       protected:
       cudaStream_t m_gpuStream;
 
-      // Deprecated - moved to GPU Manager
-      uint32_t ttlDeviceMem;
-      uint32_t ttlHostMem;
+      uint32_t local_device_memory;
+      uint32_t local_host_memory;
 
       GPUManager& gpuMgr = GPUManager::Instance();
 
@@ -90,27 +88,31 @@ namespace Support
       Complex64* m_h_debugBuffer = nullptr;
    };
 
-   inline void Cuda_timer::ProfileEvent(const char* desc)
+   inline void Benchmark_manager::ProfileEvent(const char* desc)
    {
       if(m_profileEnable)
+      {
          ProfileEventEx(desc);
+      }
    }
 
-   inline cudaError_t Cuda_timer::ProfileEvent2(const char* desc)
+   inline cudaError_t Benchmark_manager::ProfileEvent2(const char* desc)
    {
       cudaError_t error = cudaSuccess;
       if(m_profileEnable)
+      {
          error = (ProfileEventEx2(desc));
+      }
       return error;
    }
 
-   inline void Cuda_timer::ProfileEventStart()
+   inline void Benchmark_manager::ProfileEventStart()
    {
       m_profileNum = 0;
       ProfileEvent("Start");
    }
 
-   inline cudaError_t Cuda_timer::ProfileEventStart2()
+   inline cudaError_t Benchmark_manager::ProfileEventStart2()
    {
       m_profileNum = 0;
       return (ProfileEvent2("Start"));
